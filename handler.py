@@ -22,6 +22,7 @@ BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
 LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 TESSDATA_DIR = os.path.join(LAMBDA_TASK_ROOT, 'tessdata')
 s3 = boto3.resource('s3')
+dynamodb = boto3.resource('dynamodb')
 logging.basicConfig(format='%(asctime)-15s [%(name)s-%(process)d] %(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def F(event, context):
               text_path  = pdf_to_text(image_path)
               s3.Object('telos-2', "{}.png".format(predicat)).put(Body=open(image_path, 'rb'))
               s3.Object('telos-2', "{}.txt".format(predicat)).put(Body=open(text_path, 'rb'))
-
+              update_counter(key)
             except Exception as e:
               print(e)
       #end_with
@@ -103,4 +104,22 @@ def pdf_to_text(input):
 
 #end_def
 
-
+def update_counter (key):
+     match = re.search(r'(.*)/(.*).pdf', key)
+     job_id = match.group(1)
+     print (job_id)
+     table = dynamodb.Table('FAN')
+     response = table.update_item(
+                     Key={
+                       'ID': job_id
+                     },
+                     UpdateExpression='SET instance = instance - :inc',
+                     ExpressionAttributeValues={
+                     ':inc': 1
+                     },
+                     ReturnValues="UPDATED_NEW"
+               )
+     print("UPDATING JOB")
+     print(response)
+    
+#end_def
