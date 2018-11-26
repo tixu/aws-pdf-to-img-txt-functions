@@ -26,6 +26,10 @@ dynamodb = boto3.resource('dynamodb')
 logging.basicConfig(format='%(asctime)-15s [%(name)s-%(process)d] %(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+mode = os.getenv('output','pdf')
+lang = os.getenv('lang', 'eng')
+
+
 def F(event, context):
     bucket = event['Records'][0]['s3']['bucket']['name']
     for record in event['Records']:
@@ -58,12 +62,12 @@ def F(event, context):
                raise e
             try:
               image_path = pdf_to_img(f.name)
-              text_path  = pdf_to_text(image_path)
-              s3.Object('telos-2', "{}.png".format(predicat)).put(Body=open(image_path, 'rb'))
-              s3.Object('telos-2', "{}.txt".format(predicat)).put(Body=open(text_path, 'rb'))
+              text_path  = pdf_to_text(image_path, mode)
+#              s3.Object('telos-2', "{}.png".format(predicat)).put(Body=open(image_path, 'rb'))
+              s3.Object('telos-2', "{}.{}".format(predicat,mode)).put(Body=open(text_path, 'rb'))
               update_counter(key)
             except Exception as e:
-              print(e)
+              print(e) 
       #end_with
 # end_def
 def pdf_to_img(input):
@@ -77,27 +81,37 @@ def pdf_to_img(input):
        return f.name
 # end_def
 
-def pdf_to_text(input):
-      print('received file {}'.format(input))
+def pdf_to_text(input, mode):
+      print('received file {} '.format(input))
       if os.path.getsize(input) == 0:
          raise Exception('pdf_to_text_receive_an empty file {}'.format(imagepath))
 
       with NamedTemporaryFile(mode='wb', prefix="tesr_", delete=True) as f:
             print (f.name)
-            command = '{}/tesseract {} {}'.format(
+            if mode == 'pdf' : 
+                command = '{}/tesseract {} {} -l {} pdf'.format(
                     BIN_DIR,
                     input,
-                    f.name,
+                     f.name,
+                    lang,
             )
+            else: 
+              if mode == 'pdf' :
+                  command = '{}/ tesseract {} {} -l {}'.format(
+                      BIN_DIR, 
+                      input,
+                       f.name,
+                       lang,
+              )
 
             try:
               print (command)
               output = subprocess.run(command, shell=True)          
               print(output)
 
-              if os.path.getsize("{}.txt".format(f.name)) == 0:
+              if os.path.getsize("{}.{}".format(f.name,mode)) == 0:
                  raise Exception('OCR failed:\n{}'.format(output))
-              return "{}.txt".format(f.name)
+              return "{}.{}".format(f.name,mode)
             except Exception as e:
                print('exception')
                print(e)
