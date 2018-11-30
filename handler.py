@@ -26,8 +26,9 @@ dynamodb = boto3.resource('dynamodb')
 logging.basicConfig(format='%(asctime)-15s [%(name)s-%(process)d] %(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-mode = os.getenv('output','pdf')
+mode = os.getenv('mode','pdf')
 lang = os.getenv('lang', 'eng')
+output = os.getenv('output', 'smals-work-2')
 
 
 def F(event, context):
@@ -63,8 +64,8 @@ def F(event, context):
             try:
               image_path = pdf_to_img(f.name)
               text_path  = pdf_to_text(image_path, mode)
-#              s3.Object('telos-2', "{}.png".format(predicat)).put(Body=open(image_path, 'rb'))
-              s3.Object('telos-2', "{}.{}".format(predicat,mode)).put(Body=open(text_path, 'rb'))
+#              s3.Object(output, "{}.png".format(predicat)).put(Body=open(image_path, 'rb'))
+              s3.Object(output, "{}.{}".format(predicat,mode)).put(Body=open(text_path, 'rb'))
               update_counter(key)
             except Exception as e:
               print(e) 
@@ -121,7 +122,7 @@ def pdf_to_text(input, mode):
 def update_counter (key):
      match = re.search(r'(.*)/(.*).pdf', key)
      job_id = match.group(1)
-     print (job_id)
+     print ("key is {}".format(job_id))
      table = dynamodb.Table('FAN')
      response = table.update_item(
                      Key={
