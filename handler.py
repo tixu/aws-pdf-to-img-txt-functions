@@ -1,4 +1,3 @@
-import asyncio
 from contextlib import closing
 import concurrent.futures
 import io
@@ -13,7 +12,10 @@ import time
 from uuid import uuid4
 import urllib
 import subprocess
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch_all
 
+patch_all()
 
 import boto3
 
@@ -34,7 +36,7 @@ output = os.getenv('output', 'smals-work-2')
 def F(event, context):
     bucket = event['Records'][0]['s3']['bucket']['name']
     for record in event['Records']:
-        key = urllib.parse.unquote_plus(record['s3']['object']['key'])
+        key = urllib.unquote_plus(record['s3']['object']['key'])
         try:
           print("Bucket: "+ bucket)
           print("Key: "+ key)
@@ -71,17 +73,19 @@ def F(event, context):
               print(e) 
       #end_with
 # end_def
+@xray_recorder.capture('pdf to img')
 def pdf_to_img(input):
        with NamedTemporaryFile(mode='wb', suffix=".png", prefix="gs_", delete=False) as f:
             print (f.name)
             cmdline = [os.path.join(BIN_DIR, 'gs'), '-sDEVICE=png16m', '-dINTERPOLATE', '-r300', '-o', f.name , input, ]  # extract the page as an image
             print(cmdline)
-            output=subprocess.run(cmdline)
+            output=subprocess.call(cmdline)
             if os.path.getsize(f.name) == 0:
                  raise Exception('Ghostscript image extraction failed with output:\n{}'.format(output))
        return f.name
 # end_def
 
+@xray_recorder.capture('pdf to txt')
 def pdf_to_text(input, mode):
       print('received file {} '.format(input))
       if os.path.getsize(input) == 0:
@@ -107,7 +111,7 @@ def pdf_to_text(input, mode):
 
             try:
               print (command)
-              output = subprocess.run(command, shell=True)          
+              output = subprocess.call(command, shell=True)          
               print(output)
 
               if os.path.getsize("{}.{}".format(f.name,mode)) == 0:
@@ -118,7 +122,7 @@ def pdf_to_text(input, mode):
                print(e)
 
 #end_def
-
+@xray_recorder.capture('update counter')
 def update_counter (key):
      match = re.search(r'(.*)/(.*).pdf', key)
      job_id = match.group(1)
